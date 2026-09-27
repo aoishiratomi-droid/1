@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thiệp Sinh Nhật Đặc Biệt</title>
+  
+  <style>
+    /* Reset cơ bản và cấu hình giao diện đen toàn màn hình */
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      color: #fff;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Đổi kiểu màn hình chung */
+    .screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.8s ease-in-out;
+      z-index: 1;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 10;
+    }
+
+    /* 1. Lớp phủ bắt đầu */
+    #start-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      cursor: pointer;
+      transition: opacity 0.6s ease;
+    }
+    #start-overlay p {
+      color: #ff80bf;
+      font-size: 1.3rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      animation: pulseText 1.2s infinite alternate;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    /* 2. Màn hình đếm ngược */
+    #screen-countdown { background: #000; }
+    .countdown-number {
+      font-size: 9rem;
+      font-weight: 800;
+      color: #ff4d4d;
+      text-shadow: 0 0 25px #ff4d4d, 0 0 50px #ff0055;
+      animation: pulseNum 0.8s infinite alternate ease-in-out;
+    }
+
+    /* 3. Màn hình khóa password */
+    #screen-password {
+      background: radial-gradient(circle, #2a081d 0%, #000000 100%);
+    }
+    .pass-card {
+      background: rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 35px 30px;
+      border-radius: 24px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+      width: 90%;
+      max-width: 360px;
+    }
+    .pass-card h2 {
+      margin-bottom: 20px;
+      font-size: 1.4rem;
+      color: #ff80bf;
+      letter-spacing: 0.5px;
+    }
+    .pass-card input {
+      width: 100%;
+      padding: 14px 15px;
+      border-radius: 12px;
+      border: 1.5px solid #ff4d4d;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      font-size: 1.3rem;
+      text-align: center;
+      outline: none;
+      margin-bottom: 15px;
+      letter-spacing: 4px;
+      transition: border-color 0.3s;
+    }
+    .pass-card input:focus {
+      border-color: #ff80bf;
+      box-shadow: 0 0 10px rgba(255, 128, 191, 0.5);
+    }
+    .pass-card button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(45deg, #ff4d4d, #ff0055);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(255, 0, 85, 0.4);
+      transition: transform 0.2s, background 0.3s;
+    }
+    .pass-card button:active {
+      transform: scale(0.97);
+    }
+    .pass-hint {
+      font-size: 0.85rem;
+      color: #ffb6c1;
+      margin-top: 12px;
+      font-style: italic;
+    }
+    .error-msg {
+      color: #ff4d4d;
+      font-size: 0.9rem;
+      margin-top: 10px;
+      min-height: 20px;
+      font-weight: 500;
+    }
+
+    /* 4. Màn hình chính */
+    #screen-main { background: #000; position: relative; }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Thư viện ảnh trình chiếu */
+    .gallery-container {
+      position: absolute;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+    .slide-img {
+      position: absolute;
+      max-width: 82%;
+      max-height: 52vh;
+      border-radius: 18px;
+      box-shadow: 0 0 30px rgba(255, 105, 180, 0.7);
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      opacity: 0;
+      transform: scale(0.7);
+      transition: all 0.9s cubic-bezier(0.25, 1, 0.5, 1);
+      object-fit: cover;
+    }
+    .slide-img.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* Chú thỏ và hộp quà */
+    .rabbit-wrapper {
+      position: absolute;
+      bottom: 12%;
+      left: -160px;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: left 3.8s cubic-bezier(0.25, 1, 0.5, 1);
+      cursor: pointer;
+    }
+    .rabbit-wrapper.run-in {
+      left: calc(50% - 50px);
+    }
+    .rabbit {
+      position: relative;
+      width: 100px;
+      height: 120px;
+    }
+    .rabbit-wrapper.hopping .rabbit {
+      animation: hop 0.4s infinite alternate ease-in-out;
+    }
+    .ear {
+      position: absolute;
+      top: -35px;
+      width: 22px;
+      height: 50px;
+      background: #fff;
+      border-radius: 50% 50% 0 0;
+      border: 3px solid #ffb6c1;
+    }
+    .ear.left { left: 18px; transform: rotate(-10deg); }
+    .ear.right { right: 18px; transform: rotate(10deg); }
+    .head {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 80px;
+      height: 70px;
+      background: #fff;
+      border-radius: 50%;
+    }
+    .eye {
+      position: absolute;
+      top: 28px;
+      width: 10px;
+      height: 10px;
+      background: #333;
+      border-radius: 50%;
+    }
+    .eye.left { left: 20px; } .eye.right { right: 20px; }
+    .blush {
+      position: absolute;
+      top: 38px;
+      width: 14px;
+      height: 8px;
+      background: #ff9999;
+      border-radius: 50%;
+      opacity: 0.6;
+    }
+    .blush.left { left: 12px; } .blush.right { right: 12px; }
+    .nose {
+      position: absolute;
+      top: 36px;
+      left: 36px;
+      width: 8px;
+      height: 6px;
+      background: #ff6680;
+      border-radius: 50%;
+    }
+    .body-rabbit {
+      position: absolute;
+      top: 65px;
+      left: 20px;
+      width: 60px;
+      height: 50px;
+      background: #fff;
+      border-radius: 40px 40px 20px 20px;
+    }
+    .gift-box {
+      position: absolute;
+      bottom: 5px;
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(45deg, #ff3366, #ff6699);
+      border-radius: 10px;
+      box-shadow: 0 5px 20px rgba(255, 51, 102, 0.7);
+      z-index: 5;
+      animation: giftGlow 1.2s infinite alternate;
+    }
+    .gift-ribbon-v {
+      position: absolute;
+      top: 0;
+      left: 19px;
+      width: 10px;
+      height: 100%;
+      background: #ffd700;
+    }
+    .gift-ribbon-h {
+      position: absolute;
+      top: 19px;
+      left: 0;
+      width: 100%;
+      height: 10px;
+      background: #ffd700;
+    }
+    .gift-bow {
+      position: absolute;
+      top: -10px;
+      left: 14px;
+      width: 20px;
+      height: 10px;
+      background: #ffd700;
+      border-radius: 10px;
+    }
+
+    .click-hint {
+      margin-top: 15px;
+      font-size: 0.95rem;
+      color: #ffb6c1;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 8px 14px;
+      border-radius: 15px;
+      border: 1px solid #ff80bf;
+      animation: pulseText 1s infinite alternate;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      white-space: nowrap;
+    }
+
+    /* Bức thư chúc mừng */
+    .letter-container {
+      position: absolute;
+      z-index: 10;
+      width: 88%;
+      max-width: 440px;
+      background: rgba(20, 5, 15, 0.92);
+      border: 1px solid rgba(255, 105, 180, 0.5);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 28px;
+      border-radius: 22px;
+      box-shadow: 0 0 40px rgba(255, 20, 147, 0.5);
+      opacity: 0;
+      transform: translateY(40px) scale(0.9);
+      transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      text-align: center;
+      pointer-events: none;
+    }
+    .letter-container.show {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+    .letter-container h1 {
+      color: #ff69b4;
+      font-size: 1.6rem;
+      margin-bottom: 14px;
+      letter-spacing: 1px;
+    }
+    .letter-container p {
+      color: #ffe6f2;
+      font-size: 1.02rem;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+
+    /* Dòng chữ credits ở cuối */
+    .after-credits {
+      position: absolute;
+      bottom: -100px;
+      z-index: 12;
+      text-align: center;
+      opacity: 0;
+      transition: all 2s ease-in-out;
+      pointer-events: none;
+      width: 100%;
+      padding: 0 20px;
+    }
+    .after-credits.show {
+      bottom: 25px;
+      opacity: 1;
+    }
+    .after-credits .credit-line {
+      font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.88);
+      letter-spacing: 1.5px;
+      margin: 4px 0;
+    }
+    .after-credits .credit-wish {
+      font-size: 1.18rem;
+      font-weight: 600;
+      color: #ff99c2;
+      margin-top: 10px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 12px #ff3385, 0 0 25px #ff0055;
+      animation: pulseText 1.5s infinite alternate;
+    }
+
+    /* Animations */
+    @keyframes hop {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-18px); }
+    }
+    @keyframes giftGlow {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+    @keyframes pulseText {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+    @keyframes pulseNum {
+      0% { transform: scale(1); opacity: 0.9; }
+      100% { transform: scale(1.15); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Audio phát nhạc nền từ file falling-you.mp3 cùng thư mục -->
+  <audio id="bg-music" src="falling-you.mp3" loop preload="auto"></audio>
+
+  <!-- 1. Lớp phủ chạm để bắt đầu -->
+  <div id="start-overlay" onclick="startApp()">
+    <p>✨ Chạm vào màn hình để bắt đầu ✨</p>
+  </div>
+
+  <!-- 2. Màn hình đếm ngược -->
+  <div id="screen-countdown" class="screen active">
+    <div id="num-box" class="countdown-number">5</div>
+  </div>
+
+  <!-- 3. Màn hình nhập Password -->
+  <div id="screen-password" class="screen">
+    <div class="pass-card">
+      <h2>Mở Khóa Trái Tim</h2>
+      <input type="password" id="pass-input" maxlength="4" placeholder="••••" pattern="\d*" inputmode="numeric" />
+      <button onclick="handleUnlock()">Mở Khóa</button>
+      <div class="pass-hint">Gợi ý: Sinh nhật bạn đó 🎂</div>
+      <div id="error-msg" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- 4. Màn hình chính -->
+  <div id="screen-main" class="screen">
+    <!-- Heart Canvas Background -->
+    <canvas id="heartCanvas"></canvas>
+
+    <!-- Thư viện ảnh -->
+    <div class="gallery-container">
+      <img id="img1" class="slide-img" src="anh1.jpg" alt="Ảnh 1" />
+      <img id="img2" class="slide-img" src="anh2.jpg" alt="Ảnh 2" />
+      <img id="img3" class="slide-img" src="anh3.jpg" alt="Ảnh 3" />
+      <img id="img4" class="slide-img" src="anh4.jpg" alt="Ảnh 4" />
+      <img id="img5" class="slide-img" src="anh5.jpg" alt="Ảnh 5" />
+    </div>
+
+    <!-- Chú thỏ cute chạy mang quà -->
+    <div id="rabbitWrapper" class="rabbit-wrapper" onclick="openGiftLetter()">
+      <div class="rabbit">
+        <div class="ear left"></div><div class="ear right"></div>
+        <div class="head">
+          <div class="eye left"></div><div class="eye right"></div>
+          <div class="blush left"></div><div class="blush right"></div>
+          <div class="nose"></div>
+        </div>
+        <div class="body-rabbit"></div>
+        <div class="gift-box">
+          <div class="gift-bow"></div>
+          <div class="gift-ribbon-v"></div>
+          <div class="gift-ribbon-h"></div>
+        </div>
+      </div>
+      <div id="clickHint" class="click-hint">🎁 Nhấn vào quà để mở thư nè!</div>
+    </div>
+
+    <!-- Tấm thư chúc mừng -->
+    <div id="letter" class="letter-container">
+      <h1>Gửi Doanh ❤️</h1>
+      <p>Cảm ơn Doanh vì đã luôn xuất hiện và làm cho mọi khoảnh khắc trở nên thật đặc biệt.</p>
+      <p>Chúc Doanh tuổi mới luôn tràn ngập niềm vui, rực rỡ và trọn vẹn! Mọi người tin rằng Doanh sẽ tỏa sáng dù ở bất cứ đâu</p>
+    <p style="text-align: right; font-style: italic; font-weight: bold; color: #ff80bf; margin-top: 14px;">- From Vân, Hạnh, Quỳnh with love -</p>
+    </div>
+
+    <!-- Credits ở cuối -->
+    <div id="afterCredits" class="after-credits">
+      <div class="credit-line">Made by: <b>Khánh Vân</b></div>
+      <div class="credit-line">Collab with: <b>Ngọc Hạnh - Vân Quỳnh</b></div>
+      <div class="credit-wish">✨ Chúc Doanh một đời bình an ✨</div>
+    </div>
+  </div>
+
+  <script>
+    const SECRET_PASSWORD = "2709";
+    let currentNumber = 5;
+    let countdownTimer = null;
+
+    // 1. Kích hoạt phát nhạc từ giây thứ 5 & bắt đầu đếm ngược
+    function startApp() {
+      const overlay = document.getElementById('start-overlay');
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.style.display = 'none', 600);
+
+      const music = document.getElementById('bg-music');
+      if (music) {
+        music.currentTime = 5; // Bắt đầu phát nhạc từ giây thứ 5 theo yêu cầu
+        music.play().catch(err => {
+          console.log("Trình duyệt chặn tự động phát âm thanh:", err);
+        });
+      }
+
+      // Đếm ngược từ 5 về 0
+      const numDisplay = document.getElementById('num-box');
+      countdownTimer = setInterval(() => {
+        currentNumber--;
+        if (currentNumber >= 0) {
+          numDisplay.textContent = currentNumber;
+        }
+        if (currentNumber === 0) {
+          clearInterval(countdownTimer);
+          setTimeout(() => {
+            switchScreen('screen-countdown', 'screen-password');
+          }, 800);
+        }
+      }, 1000);
+    }
+
+    // Chuyển đổi giữa các màn hình
+    function switchScreen(fromId, toId) {
+      document.getElementById(fromId).classList.remove('active');
+      document.getElementById(toId).classList.add('active');
+    }
+
+    // 2. Xử lý mở khóa Password
+    function handleUnlock() {
+      const input = document.getElementById('pass-input').value;
+      if (input === SECRET_PASSWORD) {
+        switchScreen('screen-password', 'screen-main');
+        startMainExperience();
+      } else {
+        const errorMsg = document.getElementById('error-msg');
+        errorMsg.innerText = "Mật mã chưa đúng nè!";
+        document.getElementById('pass-input').value = "";
+        setTimeout(() => { errorMsg.innerText = ""; }, 2500);
+      }
+    }
+
+    // Lắng nghe phím Enter trong ô mật khẩu
+    document.getElementById('pass-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        handleUnlock();
+      }
+    });
+
+    // 3. Khởi chạy toàn bộ màn hình chính
+    function startMainExperience() {
+      initHeartCanvas();
+      runGalleryAndLetter();
+    }
+
+    // Canvas Trái Tim Lung Linh Background
+    function initHeartCanvas() {
+      const canvas = document.getElementById('heartCanvas');
+      const ctx = canvas.getContext('2d');
+      let width = canvas.width = window.innerWidth;
+      let height = canvas.height = window.innerHeight;
+
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      });
+
+      const particles = [];
+      const particleCount = 420;
+
+      for (let i = 0; i < particleCount; i++) {
+        const t = Math.random() * Math.PI * 2;
+        // Công thức tọa độ trái tim
+        const pos = {
+          x: 16 * Math.pow(Math.sin(t), 3),
+          y: -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+        };
+        const shrinkFactor = 0.18 + Math.random() * 0.82;
+        particles.push({
+          baseX: pos.x * shrinkFactor,
+          baseY: pos.y * shrinkFactor,
+          x: (Math.random() - 0.5) * width,
+          y: (Math.random() - 0.5) * height,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          size: Math.random() * 2.2 + 1,
+          color: `hsl(${330 + Math.random() * 30}, 100%, ${65 + Math.random() * 20}%)`
+        });
+      }
+
+      let tick = 0;
+      function render() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillRect(0, 0, width, height);
+
+        tick += 0.04;
+        const beat = Math.sin(tick) * 0.15 + 1;
+        const scale = (Math.min(width, height) / 38) * beat;
+
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        particles.forEach(p => {
+          p.x += (p.baseX * scale - p.x) * 0.05 + p.vx * 0.15;
+          p.y += (p.baseY * scale - p.y) * 0.05 + p.vy * 0.15;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = '#ff3385';
+          ctx.fill();
+        });
+        ctx.restore();
+
+        requestAnimationFrame(render);
+      }
+      render();
+    }
+
+    // Trình chiếu Gallery 5 ảnh & Cho thỏ mang quà chạy vào
+    function runGalleryAndLetter() {
+      const imgs = [
+        document.getElementById('img1'),
+        document.getElementById('img2'),
+        document.getElementById('img3'),
+        document.getElementById('img4'),
+        document.getElementById('img5')
+      ];
+      const rabbitWrapper = document.getElementById('rabbitWrapper');
+      const clickHint = document.getElementById('clickHint');
+
+      // Hiện lần lượt 5 hình ảnh
+      imgs.forEach((img, idx) => {
+        setTimeout(() => img.classList.add('show'), 500 + idx * 2800);
+        setTimeout(() => img.classList.remove('show'), 2900 + idx * 2800);
+      });
+
+      // Sau khi chiếu xong ảnh, cho chú thỏ chạy vào
+      const totalGalleryTime = 500 + 5 * 2800; // 14.5s
+      setTimeout(() => {
+        rabbitWrapper.classList.add('run-in', 'hopping');
+      }, totalGalleryTime);
+
+      setTimeout(() => {
+        rabbitWrapper.classList.remove('hopping');
+        clickHint.style.opacity = '1';
+      }, totalGalleryTime + 3800);
+    }
+
+    // Nhấn vào thỏ/hộp quà để mở thư & hiển thị credits
+    function openGiftLetter() {
+      document.getElementById('clickHint').style.opacity = '0';
+      document.getElementById('letter').classList.add('show');
+      
+      // Hiện Credits sau 2 giây
+      setTimeout(() => {
+        document.getElementById('afterCredits').classList.add('show');
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
